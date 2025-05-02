@@ -1,12 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h> //lib with exit statuses
-#include <semaphore.h>
 #include <pthread.h>
+#include <stdbool.h>
+
+#define timeInCity = 5000
+#define timeOnTheBridge = 1000
+
+int aQueue = 0;
+int bQueue = 0;
+int carOnTheBridge = 0;
+int inACity = 0;
+int inBCity = 0;
 
 typedef struct Car {
     int carNumber;
     int location;
-    sem_t readyToCross;
+    bool readyToCross;
 } Car;
 
 typedef struct CarQueue {
@@ -14,7 +23,6 @@ typedef struct CarQueue {
     int carFront;
     int carRear;
     int count;
-    pthread_mutex_t mutex;
 } CarQueue;
 
 int main (int argc, char *argv[])
@@ -31,4 +39,6 @@ int main (int argc, char *argv[])
         printf("Cars count must be at least 1");
         exit(EXIT_FAILURE);
     }
+
+    
 }
