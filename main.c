@@ -6,24 +6,25 @@
 #define timeInCity = 5000
 #define timeOnTheBridge = 1000
 
+pthread_mutex_t bridgeOccupied = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t valuesEdit = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t carSetup = PTHREAD_MUTEX_INITIALIZER;
+
+int count = 0;
 int aQueue = 0;
 int bQueue = 0;
-int carOnTheBridge = 0;
 int inACity = 0;
 int inBCity = 0;
 
 typedef struct Car {
     int carNumber;
-    int location;
-    bool readyToCross;
+    bool location;
 } Car;
 
-typedef struct CarQueue {
-    Car *cars[100];
-    int carFront;
-    int carRear;
-    int count;
-} CarQueue;
+void *carThread(void *passedCar);
+void logEmpty();
+void log(int carNumber, int fromLocation);
+
 
 int main (int argc, char *argv[])
 {
@@ -40,5 +41,45 @@ int main (int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    
+    count = N;
+
+    pthread_t *carTab;
+    carTab = calloc(N, sizeof(pthread_t));
+
+    srand(time(NULL));
+
+    for(int a=0; a< N; a++)
+    {
+        Car *car = malloc(sizeof(Car));
+        car->carNumber = a;
+        car->location = rand()%2;
+        pthread_create(&(carTab[a]), NULL, carThread, car);
+    }
+
+    for(int b=0; b<N; b++)
+    {
+        pthread_join(carTab[b], NULL);
+    }
+
+    free(carTab);
+    return 0;
+}
+
+void *carThread(void *passedCar)
+{
+    Car *car = (Car *)passedCar;
+    int carNumber = car->carNumber;
+    int city = car->location;
+
+    // pthread_mutex_lock
+}
+
+void logEmpty()
+{
+
+}
+
+void log(int carNumber, int fromLocation)
+{
+
 }
