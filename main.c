@@ -18,7 +18,7 @@ int inBCity = 0;
 
 typedef struct Car {
     int carNumber;
-    bool location;
+    bool location; // 0 = A, 1 = B
 } Car;
 
 void *carThread(void *passedCar);
@@ -76,10 +76,20 @@ void *carThread(void *passedCar)
 
 void logEmpty()
 {
-
+    printf("A-%d %d>>> NIKT <<<%d %d-B\n", inACity, aQueue, bQueue, inBCity);
 }
 
 void log(int carNumber, int fromLocation)
 {
+    char *sign;
+    if(fromLocation == 0)
+    {
+        *sign = ">>>";
+    }
+    else
+    {
+        *sign = "<<<";
+    }
 
+    printf("A-%d %d>>> %s %d %s <<<%d %d-B\n", inACity, aQueue, sign, carNumber, sign, bQueue, inBCity);
 }
