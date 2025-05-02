@@ -23,7 +23,7 @@ typedef struct Car {
 
 void *carThread(void *passedCar);
 void logEmpty();
-void log(int carNumber, int fromLocation);
+void logCar(int carNumber, int fromLocation);
 
 
 int main (int argc, char *argv[])
@@ -71,7 +71,16 @@ void *carThread(void *passedCar)
     int carNumber = car->carNumber;
     int city = car->location;
 
-    // pthread_mutex_lock
+    pthread_mutex_lock(&valuesEdit);
+    if(city == 0)
+    {
+        inACity++;
+    }
+    else
+    {
+        inBCity++;
+    }
+    pthread_mutex_unlock(&valuesEdit);
 }
 
 void logEmpty()
@@ -79,16 +88,16 @@ void logEmpty()
     printf("A-%d %d>>> NIKT <<<%d %d-B\n", inACity, aQueue, bQueue, inBCity);
 }
 
-void log(int carNumber, int fromLocation)
+void logCar(int carNumber, int fromLocation)
 {
     char *sign;
     if(fromLocation == 0)
     {
-        *sign = ">>>";
+        sign = ">>>";
     }
     else
     {
-        *sign = "<<<";
+        sign = "<<<";
     }
 
     printf("A-%d %d>>> %s %d %s <<<%d %d-B\n", inACity, aQueue, sign, carNumber, sign, bQueue, inBCity);
