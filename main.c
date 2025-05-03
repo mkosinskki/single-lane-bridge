@@ -130,6 +130,7 @@ void *carThread(void *passedCar)
             bQueue--;
         }
         city = (city+1)%2;
+        car->location = city;
 
         logCar(carNumber, city);
         pthread_mutex_unlock(&valuesEdit);
@@ -152,6 +153,7 @@ void *carThread(void *passedCar)
 
         usleep(timeInCity);
     }
+    free(car);
 }
 
 void logEmpty()
