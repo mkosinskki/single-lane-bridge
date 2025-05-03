@@ -2,9 +2,10 @@
 #include <stdlib.h> //lib with exit statuses
 #include <pthread.h>
 #include <stdbool.h>
+#include <unistd.h>
 
-#define timeInCity = 5000
-#define timeOnTheBridge = 1000
+#define timeInCity 5000
+#define timeOnTheBridge 1000
 
 pthread_mutex_t bridgeOccupied = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t valuesEdit = PTHREAD_MUTEX_INITIALIZER;
@@ -21,6 +22,7 @@ typedef struct Car {
     bool location; // 0 = A, 1 = B
 } Car;
 
+void carInit(Car *car);
 void *carThread(void *passedCar);
 void logEmpty();
 void logCar(int carNumber, int fromLocation);
@@ -42,6 +44,7 @@ int main (int argc, char *argv[])
     }
 
     count = N;
+    pthread_mutex_lock(&carSetup);
 
     pthread_t *carTab;
     carTab = calloc(N, sizeof(pthread_t));
@@ -65,9 +68,8 @@ int main (int argc, char *argv[])
     return 0;
 }
 
-void *carThread(void *passedCar)
+void carInit(Car *car)
 {
-    Car *car = (Car *)passedCar;
     int carNumber = car->carNumber;
     int city = car->location;
 
@@ -81,6 +83,75 @@ void *carThread(void *passedCar)
         inBCity++;
     }
     pthread_mutex_unlock(&valuesEdit);
+
+    if(inACity + inBCity == count)
+    {
+        pthread_mutex_unlock(&carSetup);
+    }
+    pthread_mutex_lock(&carSetup);
+    pthread_mutex_unlock(&carSetup);
+}
+
+void *carThread(void *passedCar)
+{
+    Car *car = (Car *)passedCar;
+    int carNumber = car->carNumber;
+    int city = car->location;
+
+    carInit(car);
+
+    // while(1)
+    for(int a=0; a<3; a++)
+    {
+        pthread_mutex_lock(&valuesEdit);
+        if(city == 0)
+        {
+            aQueue++;
+            inACity--;
+        }
+        else
+        {
+            bQueue++;
+            inBCity--;
+        }
+        logEmpty();
+        pthread_mutex_unlock(&valuesEdit);
+
+        pthread_mutex_lock(&bridgeOccupied);
+        pthread_mutex_lock(&valuesEdit);
+
+        if(city == 0)
+        {
+            aQueue--;
+
+        }
+        else
+        {
+            bQueue--;
+        }
+        city = (city+1)%2;
+
+        logCar(carNumber, city);
+        pthread_mutex_unlock(&valuesEdit);
+        
+        usleep(timeOnTheBridge);
+
+        pthread_mutex_lock(&valuesEdit);
+        if(city == 0)
+        {
+            inACity++;
+        }
+        else
+        {
+            inBCity++;
+        }
+        logEmpty();
+        pthread_mutex_unlock(&valuesEdit);
+
+        pthread_mutex_unlock(&bridgeOccupied);
+
+        usleep(timeInCity);
+    }
 }
 
 void logEmpty()
