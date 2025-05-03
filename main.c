@@ -129,10 +129,9 @@ void *carThread(void *passedCar)
         {
             bQueue--;
         }
+        logCar(carNumber, city);
         city = (city+1)%2;
         car->location = city;
-
-        logCar(carNumber, city);
         pthread_mutex_unlock(&valuesEdit);
         
         usleep(timeOnTheBridge);
