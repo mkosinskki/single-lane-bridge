@@ -158,7 +158,7 @@ void *carThread(void *passedCar)
 
 void logEmpty()
 {
-    printf("A-%d %d>>> NIKT <<<%d %d-B\n", inACity, aQueue, bQueue, inBCity);
+    printf("A-%d %d>>> [ EMPTY ] <<<%d %d-B\n", inACity, aQueue, bQueue, inBCity);
 }
 
 void logCar(int carNumber, int fromLocation)
@@ -173,5 +173,5 @@ void logCar(int carNumber, int fromLocation)
         sign = "<<<";
     }
 
-    printf("A-%d %d>>> %s %d %s <<<%d %d-B\n", inACity, aQueue, sign, carNumber, sign, bQueue, inBCity);
+    printf("A-%d %d>>> [ %s %d %s ] <<<%d %d-B\n", inACity, aQueue, sign, carNumber, sign, bQueue, inBCity);
 }
