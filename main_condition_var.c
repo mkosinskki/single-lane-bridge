@@ -102,7 +102,7 @@ void *carThread(void *passedCar)
     carInit(car);
 
     //while(1)
-    for (int a = 0; a < 3; a++) 
+    for (int a = 0; a < 1; a++) 
     {
         pthread_mutex_lock(&valuesEdit);
         if (city == 0) 
