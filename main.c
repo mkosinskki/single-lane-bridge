@@ -6,16 +6,21 @@
 
 #define timeInCity 5000
 #define timeOnTheBridge 1000
+#define maxPassesBeforeSwitch 5
 
 pthread_mutex_t bridgeOccupied = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t valuesEdit = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t carSetup = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t directionLock = PTHREAD_MUTEX_INITIALIZER;
 
 int count = 0;
 int aQueue = 0;
 int bQueue = 0;
 int inACity = 0;
 int inBCity = 0;
+int carsPassedInCurrentDirection = 0;
+
+int currentDirection = -1;
 
 typedef struct Car {
     int carNumber;
@@ -39,7 +44,7 @@ int main (int argc, char *argv[])
     int N = atoi(argv[1]);
     if(N <= 0)
     {
-        printf("Cars count must be at least 1");
+        printf("Cars count must be at least 1\n");
         exit(EXIT_FAILURE);
     }
 
@@ -92,7 +97,7 @@ void carInit(Car *car)
     pthread_mutex_unlock(&carSetup);
 }
 
-void *carThread(void *passedCar)
+void *carThread(void *passedCar) 
 {
     Car *car = (Car *)passedCar;
     int carNumber = car->carNumber;
@@ -100,16 +105,15 @@ void *carThread(void *passedCar)
 
     carInit(car);
 
-    // while(1)
-    for(int a=0; a<3; a++)
+    while(1) 
     {
         pthread_mutex_lock(&valuesEdit);
-        if(city == 0)
+        if (city == 0) 
         {
             aQueue++;
             inACity--;
-        }
-        else
+        } 
+        else 
         {
             bQueue++;
             inBCity--;
@@ -117,42 +121,78 @@ void *carThread(void *passedCar)
         logEmpty();
         pthread_mutex_unlock(&valuesEdit);
 
-        pthread_mutex_lock(&bridgeOccupied);
+        while (1) 
+        {
+            pthread_mutex_lock(&directionLock);
+            bool canGo = (currentDirection == -1 || currentDirection == city);
+
+            if (canGo && pthread_mutex_trylock(&bridgeOccupied) == 0) 
+            {
+                if (currentDirection == -1) 
+                {
+                    currentDirection = city;
+                    carsPassedInCurrentDirection = 0;  // Reset licznika
+                }
+                pthread_mutex_unlock(&directionLock);
+                break;
+            }
+            pthread_mutex_unlock(&directionLock);
+            usleep(1000);
+        }
+
         pthread_mutex_lock(&valuesEdit);
-
-        if(city == 0)
-        {
-            aQueue--;
-
-        }
-        else
-        {
-            bQueue--;
-        }
+        if (city == 0) aQueue--;
+        else bQueue--;
         logCar(carNumber, city);
-        city = (city+1)%2;
+        city = (city + 1) % 2;
         car->location = city;
         pthread_mutex_unlock(&valuesEdit);
-        
+
         usleep(timeOnTheBridge);
 
+
         pthread_mutex_lock(&valuesEdit);
-        if(city == 0)
-        {
-            inACity++;
-        }
-        else
-        {
-            inBCity++;
-        }
+        if (city == 0) inACity++;
+        else inBCity++;
         logEmpty();
         pthread_mutex_unlock(&valuesEdit);
 
+        pthread_mutex_lock(&directionLock);
+        carsPassedInCurrentDirection++;
+
+        if (carsPassedInCurrentDirection >= maxPassesBeforeSwitch) 
+        {
+            if ((currentDirection == 0 && bQueue > 0) || (currentDirection == 1 && aQueue > 0)) 
+            {
+                currentDirection = 1 - currentDirection;
+                carsPassedInCurrentDirection = 0;
+            } 
+            else 
+            {
+                carsPassedInCurrentDirection = 0;
+            }
+        }
+
+        if ((currentDirection == 0 && bQueue > 0 && aQueue == 0) || (currentDirection == 1 && aQueue > 0 && bQueue == 0)) 
+        {
+            currentDirection = 1 - currentDirection;
+            carsPassedInCurrentDirection = 0;
+        }
+
+        if (aQueue == 0 && bQueue == 0) 
+        {
+            currentDirection = -1;
+            carsPassedInCurrentDirection = 0;
+        }
+
+        pthread_mutex_unlock(&directionLock);
         pthread_mutex_unlock(&bridgeOccupied);
 
         usleep(timeInCity);
     }
+
     free(car);
+    return NULL;
 }
 
 void logEmpty()
