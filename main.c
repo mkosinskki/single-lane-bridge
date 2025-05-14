@@ -131,7 +131,7 @@ void *carThread(void *passedCar)
                 if (currentDirection == -1) 
                 {
                     currentDirection = city;
-                    carsPassedInCurrentDirection = 0;  // Reset licznika
+                    carsPassedInCurrentDirection = 0;
                 }
                 pthread_mutex_unlock(&directionLock);
                 break;
