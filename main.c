@@ -6,22 +6,22 @@
 
 #define timeInCity 5000
 #define timeOnTheBridge 1000
-#define maxPassesBeforeSwitch 5
+#define maxPassesBeforeSwitch 2 //number of cars that can pass bridge before changing direction
 
-pthread_mutex_t bridgeOccupied = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t valuesEdit = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t carSetup = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t directionLock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t bridgeOccupied = PTHREAD_MUTEX_INITIALIZER; //bridge mutex
+pthread_mutex_t valuesEdit = PTHREAD_MUTEX_INITIALIZER; //mutex to prevent race conditions when editing data like cars in city
+pthread_mutex_t carSetup = PTHREAD_MUTEX_INITIALIZER; //mutex used to sync car start
+pthread_mutex_t directionLock = PTHREAD_MUTEX_INITIALIZER; //mutex locking direction of the bridge
 
-int count = 0;
-int aQueue = 0;
-int bQueue = 0;
-int inACity = 0;
-int inBCity = 0;
+int count = 0; //all cars count
+int aQueue = 0; //cars in queue from A to B
+int bQueue = 0; //cars in queue from B to A
+int inACity = 0; //cars waiting in city A
+int inBCity = 0; //cars waiting in city B
 int carsPassedInCurrentDirection = 0;
-
 int currentDirection = -1;
 
+//car struct - single car stores own number and location
 typedef struct Car {
     int carNumber;
     bool location; // 0 = A, 1 = B
@@ -32,15 +32,17 @@ void *carThread(void *passedCar);
 void logEmpty();
 void logCar(int carNumber, int fromLocation);
 
-
+//function that checks args and starts threads
 int main (int argc, char *argv[])
 {
+    //only 1 arg is accepted (without including the name)
     if(argc != 2)
     {
         printf("Usage: %s N\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
+    //checking quantity 
     int N = atoi(argv[1]);
     if(N <= 0)
     {
@@ -56,6 +58,7 @@ int main (int argc, char *argv[])
 
     srand(time(NULL));
 
+    //threads creating with carThread fun as starting fun
     for(int a=0; a< N; a++)
     {
         Car *car = malloc(sizeof(Car));
@@ -64,6 +67,7 @@ int main (int argc, char *argv[])
         pthread_create(&(carTab[a]), NULL, carThread, car);
     }
 
+    //waiting till the end of threads
     for(int b=0; b<N; b++)
     {
         pthread_join(carTab[b], NULL);
@@ -73,11 +77,13 @@ int main (int argc, char *argv[])
     return 0;
 }
 
+//function that sets values of cars in cities, and syncs cars start
 void carInit(Car *car)
 {
     int carNumber = car->carNumber;
     int city = car->location;
 
+    //editing car values in citis based on drawn location
     pthread_mutex_lock(&valuesEdit);
     if(city == 0)
     {
@@ -89,6 +95,7 @@ void carInit(Car *car)
     }
     pthread_mutex_unlock(&valuesEdit);
 
+    //synchronization of the start of all cars
     if(inACity + inBCity == count)
     {
         pthread_mutex_unlock(&carSetup);
@@ -97,16 +104,20 @@ void carInit(Car *car)
     pthread_mutex_unlock(&carSetup);
 }
 
+//main thread function with all car logic. The function supports mechanisms to prevent starvation by changing bridge direction
 void *carThread(void *passedCar) 
 {
     Car *car = (Car *)passedCar;
     int carNumber = car->carNumber;
     int city = car->location;
 
+    //start synchronization 
     carInit(car);
 
+    //main car logic, inifinite loop
     while(1) 
     {
+        //locking mutex before editing data like cars in city or in queue
         pthread_mutex_lock(&valuesEdit);
         if (city == 0) 
         {
@@ -121,6 +132,7 @@ void *carThread(void *passedCar)
         logEmpty();
         pthread_mutex_unlock(&valuesEdit);
 
+        //car tries to get on the bridg if the direction is same as car direction and bridge is empty, otherwise thread is sleeping for 1ms and tries again.
         while (1) 
         {
             pthread_mutex_lock(&directionLock);
@@ -141,28 +153,44 @@ void *carThread(void *passedCar)
         }
 
         pthread_mutex_lock(&valuesEdit);
-        if (city == 0) aQueue--;
-        else bQueue--;
+        if(city == 0) 
+        {
+            aQueue--;
+        }
+        else 
+        {
+            bQueue--;
+        }
         logCar(carNumber, city);
+
+        //updating location
         city = (city + 1) % 2;
         car->location = city;
         pthread_mutex_unlock(&valuesEdit);
 
+        //simulation of bridge crossing
         usleep(timeOnTheBridge);
 
-
         pthread_mutex_lock(&valuesEdit);
-        if (city == 0) inACity++;
-        else inBCity++;
+        if(city == 0) 
+        {
+            inACity++;
+        }
+        else 
+        {
+            inBCity++;
+        }
         logEmpty();
         pthread_mutex_unlock(&valuesEdit);
 
         pthread_mutex_lock(&directionLock);
         carsPassedInCurrentDirection++;
 
-        if (carsPassedInCurrentDirection >= maxPassesBeforeSwitch) 
+        //logic of changing bridge direction
+        //changes direction based on maxPassesBeforeSwitch (means that if x cars passed direction is changed)
+        if(carsPassedInCurrentDirection >= maxPassesBeforeSwitch) 
         {
-            if ((currentDirection == 0 && bQueue > 0) || (currentDirection == 1 && aQueue > 0)) 
+            if((currentDirection == 0 && bQueue > 0) || (currentDirection == 1 && aQueue > 0)) 
             {
                 currentDirection = 1 - currentDirection;
                 carsPassedInCurrentDirection = 0;
@@ -173,13 +201,15 @@ void *carThread(void *passedCar)
             }
         }
 
-        if ((currentDirection == 0 && bQueue > 0 && aQueue == 0) || (currentDirection == 1 && aQueue > 0 && bQueue == 0)) 
+        //if current queue is empty, bridge direction is changed
+        if((currentDirection == 0 && bQueue > 0 && aQueue == 0) || (currentDirection == 1 && aQueue > 0 && bQueue == 0)) 
         {
             currentDirection = 1 - currentDirection;
             carsPassedInCurrentDirection = 0;
         }
 
-        if (aQueue == 0 && bQueue == 0) 
+        //if both queues are empty, currentDirection is being reset
+        if(aQueue == 0 && bQueue == 0) 
         {
             currentDirection = -1;
             carsPassedInCurrentDirection = 0;
@@ -188,6 +218,7 @@ void *carThread(void *passedCar)
         pthread_mutex_unlock(&directionLock);
         pthread_mutex_unlock(&bridgeOccupied);
 
+        //simulation of waiting in city
         usleep(timeInCity);
     }
 
@@ -195,11 +226,13 @@ void *carThread(void *passedCar)
     return NULL;
 }
 
+//function that logs changes like new car in queue or in city
 void logEmpty()
 {
     printf("A-%d %d>>> [ EMPTY ] <<<%d %d-B\n", inACity, aQueue, bQueue, inBCity);
 }
 
+//function that logs car crossing the bridge
 void logCar(int carNumber, int fromLocation)
 {
     char *sign;
