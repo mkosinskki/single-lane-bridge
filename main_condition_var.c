@@ -119,31 +119,43 @@ void *carThread(void *passedCar)
     {
         //locking mutex before editing data like cars in city or in queue
         pthread_mutex_lock(&valuesEdit);
-        if (city == 0) 
+        if (city == 0)
         {
             aQueue++;
             inACity--;
-        } 
-        else 
+        }
+        else
         {
             bQueue++;
             inBCity--;
         }
         logEmpty();
         pthread_mutex_unlock(&valuesEdit);
+
         pthread_mutex_lock(&valuesEdit);
 
-        //car waits until the bridge is free, the direction matches, and passing limits allow it.
-        while (bridge_busy || (currentDirection != -1 && currentDirection != city) || 
+        //wait until bridge is free and conditions are met for crossing
+        while (
+            bridge_busy ||
+            (currentDirection != -1 && currentDirection != city) ||
             (carsPassedInCurrentDirection >= maxPassesBeforeSwitch &&
-            ((city == 0 && bQueue > 0) || (city == 1 && aQueue > 0)))) 
+             ((city == 0 && bQueue > 0) || (city == 1 && aQueue > 0)))
+        ) 
         {
+            //if bridge is not busy but cities are empty and queues exist, decide on new direction
+            if(!bridge_busy && inACity == 0 && inBCity == 0 && (aQueue > 0 || bQueue > 0)) 
+            {
+                currentDirection = (aQueue >= bQueue) ? 0 : 1;
+                carsPassedInCurrentDirection = 0;
+                pthread_cond_broadcast(&bridge_cond);
+            }
             pthread_cond_wait(&bridge_cond, &valuesEdit);
         }
 
         bridge_busy = 1;
 
-        if (currentDirection == -1) 
+        //if direction not yet set, set it to this car's direction
+        if(currentDirection == -1)
         {
             currentDirection = city;
             carsPassedInCurrentDirection = 0;
@@ -151,7 +163,7 @@ void *carThread(void *passedCar)
 
         carsPassedInCurrentDirection++;
 
-        if (city == 0)
+        if(city == 0)
         {
             aQueue--;
         }
@@ -159,8 +171,9 @@ void *carThread(void *passedCar)
         {
             bQueue--;
         }
-        logCar(carNumber, city);
 
+        logCar(carNumber, city);
+        
         //updating location
         city = (city + 1) % 2;
         car->location = city;
@@ -173,7 +186,7 @@ void *carThread(void *passedCar)
 
         bridge_busy = 0;
 
-        if (city == 0)
+        if(city == 0)
         {
             inACity++;
         }
@@ -181,25 +194,27 @@ void *carThread(void *passedCar)
         {
             inBCity++;
         }
+
         logEmpty();
 
-        //logic of changing bridge direction
-        //changes direction based on maxPassesBeforeSwitch (means that if x cars passed direction is changed)
-        if (carsPassedInCurrentDirection >= maxPassesBeforeSwitch && ((currentDirection == 0 && bQueue > 0) || (currentDirection == 1 && aQueue > 0))) 
+        //change direction if max cars passed and other side has waiting cars
+        if(carsPassedInCurrentDirection >= maxPassesBeforeSwitch &&
+            ((currentDirection == 0 && bQueue > 0) || (currentDirection == 1 && aQueue > 0)))
         {
             currentDirection = 1 - currentDirection;
             carsPassedInCurrentDirection = 0;
         }
 
-        //if current queue is empty, bridge direction is changed
-        if ((currentDirection == 0 && aQueue == 0 && bQueue > 0) || (currentDirection == 1 && bQueue == 0 && aQueue > 0)) 
+        //change direction if no cars in current direction queue but cars on other side are waiting
+        if((currentDirection == 0 && aQueue == 0 && bQueue > 0) ||
+            (currentDirection == 1 && bQueue == 0 && aQueue > 0))
         {
             currentDirection = 1 - currentDirection;
             carsPassedInCurrentDirection = 0;
         }
 
-        //if both queues are empty, currentDirection is being reset
-        if (aQueue == 0 && bQueue == 0) 
+        //reset direction if both queues are empty
+        if(aQueue == 0 && bQueue == 0)
         {
             currentDirection = -1;
             carsPassedInCurrentDirection = 0;
